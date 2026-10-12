@@ -70,13 +70,6 @@ if model is None:
       "Please ensure 'knn.pkl' is uploaded in the same directory as `app.py`."
   )
 else:
-  # Check expected features if available
-  expected_features = getattr(model, "n_features_in_", None)
-  if expected_features:
-    st.info(
-        f"ℹ️ Model is configured to expect **{expected_features}** features."
-    )
-
   with st.form("prediction_form"):
     st.markdown("### 📋 Enter Student Details")
 
@@ -139,41 +132,57 @@ else:
     )
 
   if submit_btn:
-    # Construct initial raw dataframe
-    input_data = pd.DataFrame(
-        [[
-            age,
-            gender,
-            course,
-            study_hours,
-            class_attendance,
-            internet_access,
-            sleep_hours,
-            sleep_quality,
-            study_method,
-            facility_rating,
-            exam_difficulty,
-        ]],
-        columns=[
-            "age",
-            "gender",
-            "course",
-            "study_hours",
-            "class_attendance",
-            "internet_access",
-            "sleep_hours",
-            "sleep_quality",
-            "study_method",
-            "facility_rating",
-            "exam_difficulty",
-        ],
-    )
+    # --- ENCODE CATEGORICAL INPUTS TO MATCH NUMERIC MODEL EXPECTATIONS ---
+    # Adjust these mappings if your training notebook used different numerical encoding (e.g., LabelEncoder indices).
+
+    gender_val = 1 if gender == "Male" else (0 if gender == "Female" else 2)
+
+    course_mapping = {
+        "Computer Science": 0,
+        "Engineering": 1,
+        "Business": 2,
+        "Arts & Humanities": 3,
+        "Science": 4,
+    }
+    course_val = course_mapping.get(course, 0)
+
+    internet_val = 1 if internet_access == "Yes" else 0
+
+    sleep_quality_mapping = {
+        "Poor": 0,
+        "Fair": 1,
+        "Good": 2,
+        "Excellent": 3,
+    }
+    sleep_quality_val = sleep_quality_mapping.get(sleep_quality, 1)
+
+    study_method_mapping = {
+        "Self-study": 0,
+        "Group Study": 1,
+        "Online Videos": 2,
+        "Flashcards / Practice": 3,
+    }
+    study_method_val = study_method_mapping.get(study_method, 0)
+
+    exam_difficulty_mapping = {"Easy": 0, "Medium": 1, "Hard": 2}
+    exam_difficulty_val = exam_difficulty_mapping.get(exam_difficulty, 1)
+
+    # Build the numeric feature array (total 11 features)
+    input_data = np.array([[
+        age,
+        gender_val,
+        course_val,
+        study_hours,
+        class_attendance,
+        internet_val,
+        sleep_hours,
+        sleep_quality_val,
+        study_method_val,
+        facility_rating,
+        exam_difficulty_val,
+    ]])
 
     try:
-      # If the model expects numeric-only features or was fitted on encoded/fewer columns,
-      # adjust here. If your training script dropped one column (e.g., 'gender' or 'age'),
-      # drop it from input_data using: input_data = input_data.drop(columns=['column_name'])
-
       prediction = model.predict(input_data)
       st.markdown("<br>", unsafe_allow_html=True)
       st.markdown(
@@ -187,7 +196,7 @@ else:
       )
     except Exception as e:
       st.error(
-          f"Prediction Error: {e}. \n\nTip: Check your original training notebook"
-          " to see which exact 10 or 11 columns/features were passed into"
-          " `.fit()`."
+          f"Prediction Error: {e}. \n\nTip: If your training notebook used a"
+          " specific `LabelEncoder` object for text categories, save and load"
+          " that encoder using pickle rather than manual dictionaries."
       )
