@@ -1,114 +1,193 @@
-import streamlit as st
-import joblib
+import pickle
 import numpy as np
+import pandas as pd
+import streamlit as st
 
 # Page Configuration
 st.set_page_config(
-    page_title="Student Performance Predictor",
+    page_title="Student Performance & Score Predictor",
     page_icon="🎓",
-    layout="centered",
-    initial_sidebar_state="expanded"
+    layout="wide",
 )
 
-# Custom Styling / Shadow and Layout enhancements
-st.markdown("""
+# Custom CSS for Shadow Effects and Modern Styling
+st.markdown(
+    """
     <style>
-    .main-header {
-        font-size: 2.5rem;
-        color: #1E3A8A;
-        text-align: center;
-        font-weight: 700;
-        margin-bottom: 0.5rem;
+    .main {
+        background-color: #f8f9fa;
     }
-    .sub-header {
-        font-size: 1.1rem;
-        color: #4B5563;
-        text-align: center;
-        margin-bottom: 2rem;
+    .card {
+        background-color: #ffffff;
+        padding: 2rem;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        margin-bottom: 1.5rem;
     }
-    .prediction-card {
-        padding: 20px;
-        border-radius: 10px;
-        background-color: #F3F4F6;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    .metric-card {
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 6px 15px rgba(99, 102, 241, 0.3);
         text-align: center;
-        margin-top: 20px;
     }
     </style>
-""", unsafe_allow_html=True)
+    """,
+    unsafe_allow_html=True,
+)
 
-# Load the trained KNN model
+
+# Load the model securely with caching
 @st.cache_resource
 def load_model():
-    return joblib.load('knn.pkl')
+  try:
+    with open("knn.pkl", "rb") as f:
+      model = pickle.load(f)
+    return model
+  except Exception as e:
+    st.error(f"Error loading model file: {e}")
+    return None
 
-try:
-    model = load_model()
-except Exception as e:
-    st.error(f"Error loading model: {e}")
-    st.stop()
+
+model = load_model()
 
 # Header Section
-st.markdown('<div class="main-header">🎓 Student Performance Predictor</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">Provide the student details below to estimate performance outcomes using a K-Nearest Neighbors (KNN) model.</div>', unsafe_allow_html=True)
+st.markdown(
+    """
+    <div class="card" style="text-align: center;">
+        <h1>🎓 Student Academic Performance Predictor</h1>
+        <p style="color: #6b7280; font-size: 1.1rem;">
+            Provide the student parameters below to estimate performance using your trained model.
+        </p>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
-# Input Form Layout
-with st.form("prediction_form"):
-    st.subheader("📝 Student Details & Habits")
-    
-    col1, col2 = st.columns(2)
-    
+if model is None:
+  st.warning(
+      "Please ensure 'knn.pkl' is uploaded in the same directory as `app.py`."
+  )
+else:
+  # Check expected features if available
+  expected_features = getattr(model, "n_features_in_", None)
+  if expected_features:
+    st.info(
+        f"ℹ️ Model is configured to expect **{expected_features}** features."
+    )
+
+  with st.form("prediction_form"):
+    st.markdown("### 📋 Enter Student Details")
+
+    col1, col2, col3 = st.columns(3)
+
     with col1:
-        age = st.number_input("Age", min_value=15, max_value=50, value=20, step=1)
-        gender = st.selectbox("Gender", options=["Male", "Female", "Other"])
-        course = st.selectbox("Course / Field of Study", options=["Science", "Arts", "Engineering", "Business", "Other"])
-        study_hours = st.slider("Daily Study Hours", min_value=0.0, max_value=15.0, value=4.0, step=0.5)
-        class_attendance = st.slider("Class Attendance (%)", min_value=0, max_value=100, value=85, step=1)
+      age = st.number_input("Age", min_value=15, max_value=50, value=20)
+      gender = st.selectbox("Gender", ["Male", "Female", "Other"])
+      course = st.selectbox(
+          "Course / Major",
+          [
+              "Computer Science",
+              "Engineering",
+              "Business",
+              "Arts & Humanities",
+              "Science",
+          ],
+      )
+      study_hours = st.number_input(
+          "Weekly Study Hours", min_value=0.0, max_value=80.0, value=15.0
+      )
 
     with col2:
-        internet_access = st.selectbox("Internet Access at Home", options=["Yes", "No"])
-        sleep_hours = st.slider("Daily Sleep Hours", min_value=0.0, max_value=12.0, value=7.0, step=0.5)
-        sleep_quality = st.selectbox("Sleep Quality", options=["Good", "Average", "Poor"])
-        study_method = st.selectbox("Primary Study Method", options=["Self-Study", "Group Study", "Online Videos", "Classes"])
-        facility_rating = st.slider("Campus Facility Rating (1-10)", min_value=1, max_value=10, value=7, step=1)
+      class_attendance = st.slider(
+          "Class Attendance (%)", min_value=0.0, max_value=100.0, value=85.0
+      )
+      internet_access = st.selectbox(
+          "Internet Access at Home", ["Yes", "No"]
+      )
+      sleep_hours = st.number_input(
+          "Average Sleep Hours (per night)",
+          min_value=1.0,
+          max_value=15.0,
+          value=7.0,
+      )
+      sleep_quality = st.selectbox(
+          "Sleep Quality", ["Poor", "Fair", "Good", "Excellent"]
+      )
 
-    submitted = st.form_submit_button("Predict Performance", use_container_width=True)
+    with col3:
+      study_method = st.selectbox(
+          "Primary Study Method",
+          [
+              "Self-study",
+              "Group Study",
+              "Online Videos",
+              "Flashcards / Practice",
+          ],
+      )
+      facility_rating = st.slider(
+          "Campus Facility Rating (1-10)", min_value=1, max_value=10, value=7
+      )
+      exam_difficulty = st.selectbox(
+          "Expected Exam Difficulty", ["Easy", "Medium", "Hard"]
+      )
 
-# Prediction Logic
-if submitted:
-    # Note: Depending on how your categorical columns were encoded during training 
-    # (e.g., One-Hot Encoding vs Label Encoding), you may need to transform 
-    # these raw user inputs into the exact numerical array format the model expects.
-    
-    # Placeholder mapping example (Adjust indices based on your training pipeline):
-    gender_val = 1 if gender == "Male" else (0 if gender == "Female" else 2)
-    internet_val = 1 if internet_access == "Yes" else 0
-    
-    # Construct feature array matching the 10 training features[cite: 1]
-    # (Modify this feature vector assembly to match your exact preprocessing pipeline)
-    features = np.array([[
-        age, 
-        gender_val, 
-        0, # placeholder categorical encoding for course
-        study_hours, 
-        class_attendance, 
-        internet_val, 
-        sleep_hours, 
-        0, # placeholder categorical encoding for sleep_quality
-        0, # placeholder categorical encoding for study_method
-        facility_rating
-    ]])
+    st.markdown("<br>", unsafe_allow_html=True)
+    submit_btn = st.form_submit_button(
+        "🚀 Predict Performance", use_container_width=True
+    )
+
+  if submit_btn:
+    # Construct initial raw dataframe
+    input_data = pd.DataFrame(
+        [[
+            age,
+            gender,
+            course,
+            study_hours,
+            class_attendance,
+            internet_access,
+            sleep_hours,
+            sleep_quality,
+            study_method,
+            facility_rating,
+            exam_difficulty,
+        ]],
+        columns=[
+            "age",
+            "gender",
+            "course",
+            "study_hours",
+            "class_attendance",
+            "internet_access",
+            "sleep_hours",
+            "sleep_quality",
+            "study_method",
+            "facility_rating",
+            "exam_difficulty",
+        ],
+    )
 
     try:
-        prediction = model.predict(features)
-        
-        # Display Result Card with Shadow Effect
-        st.markdown(f"""
-            <div class="prediction-card">
-                <h3>Predicted Result</h3>
-                <h1 style="color: #2563EB;">{prediction[0]:.2f}</h1>
-            </div>
-        """, unsafe_allow_html=True)
-        
+      # If the model expects numeric-only features or was fitted on encoded/fewer columns,
+      # adjust here. If your training script dropped one column (e.g., 'gender' or 'age'),
+      # drop it from input_data using: input_data = input_data.drop(columns=['column_name'])
+
+      prediction = model.predict(input_data)
+      st.markdown("<br>", unsafe_allow_html=True)
+      st.markdown(
+          f"""
+                <div class="metric-card">
+                    <h2>Estimated Predicted Score</h2>
+                    <p style="font-size: 2.5rem; font-weight: bold; margin: 0;">{prediction[0]:.2f}</p>
+                </div>
+                """,
+          unsafe_allow_html=True,
+      )
     except Exception as e:
-        st.error(f"Prediction failed. Ensure your feature array matches the model's expected shape. Error: {e}")
+      st.error(
+          f"Prediction Error: {e}. \n\nTip: Check your original training notebook"
+          " to see which exact 10 or 11 columns/features were passed into"
+          " `.fit()`."
+      )
